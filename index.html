@@ -10,15 +10,18 @@
             background-color: #000000; /* 背景を完全な黒に */
             font-family: sans-serif;
             touch-action: none; /* 全体のスクロール防止 */
+            color: white;
         }
 
         /* 画面全体の警告オーバーレイ */
         #global-warning {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(255, 0, 0, 0.5); /* 画面全体を赤く */
-            box-shadow: inset 0 0 100px red; /* 画面の端をより赤く */
-            z-index: 500; /* ウィンドウより下、背景より上 */
-            opacity: 0; transition: opacity 0.5s; pointer-events: none;
+            background: rgba(255, 0, 0, 0.5);
+            box-shadow: inset 0 0 100px red;
+            z-index: 500;
+            opacity: 0; 
+            /* transitionはJSで動的に設定します */
+            pointer-events: none;
             display: flex; align-items: center; justify-content: center;
         }
         #global-warning-text {
@@ -34,42 +37,69 @@
             width: 320px; height: 240px;
             min-width: 150px; min-height: 120px;
             background: #000;
-            border: 2px solid #666; /* 黒背景で見えるように枠線を明るく */
+            border: 2px solid #666;
             border-radius: 10px;
             box-shadow: 0 0 15px rgba(255,255,255,0.1);
             display: flex; flex-direction: column;
             overflow: hidden;
             z-index: 1000;
-            /* ウィンドウ全体でカーソルを移動アイコンに */
             cursor: move;
         }
 
-        /* ヘッダー (情報は残すが、ドラッグ判定はウィンドウ全体で行う) */
+        /* ヘッダー */
         #window-header {
-            height: 24px;
+            height: 30px;
             background: #007AFF;
             display: flex; align-items: center; padding: 0 10px;
             color: white; font-size: 12px; font-weight: bold;
-            user-select: none; pointer-events: none; /* 下のウィンドウにイベントを通す */
+            user-select: none;
+            /* ドラッグ判定はウィンドウ全体で行うが、ボタン操作のためにポインターイベントは通す */
+        }
+        
+        #settings-btn {
+            background: none; border: none; cursor: pointer; font-size: 16px; padding: 0 10px;
+            margin-left: 10px; pointer-events: auto; /* ここだけクリック可能にする */
         }
 
         /* カメラ表示エリア */
         #camera-container {
             flex: 1; position: relative; background: #000;
-            pointer-events: none; /* ドラッグを邪魔しないようにする */
+            pointer-events: none;
         }
         video {
             width: 100%; height: 100%; object-fit: cover;
         }
 
-        /* リサイズハンドル (右下) */
+        /* リサイズハンドル */
         #resize-handle {
             position: absolute; bottom: 0; right: 0;
-            width: 40px; height: 40px; /* 押しやすいように少し大きく */
+            width: 40px; height: 40px;
             background: linear-gradient(135deg, transparent 50%, #007AFF 50%);
             cursor: nwse-resize;
             z-index: 1100;
             touch-action: none;
+        }
+
+        /* 設定モーダル */
+        #settings-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); z-index: 3000;
+            display: none; /* 初期状態は非表示 */
+            align-items: center; justify-content: center;
+        }
+        #settings-panel {
+            background: #222; padding: 20px; border-radius: 15px;
+            width: 80%; max-width: 400px;
+            border: 1px solid #555;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+        .setting-item { margin-bottom: 20px; }
+        .setting-label { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 14px;}
+        input[type="range"] { width: 100%; accent-color: #007AFF; }
+        
+        #close-settings {
+            width: 100%; padding: 10px; background: #444; color: white;
+            border: none; border-radius: 5px; cursor: pointer; margin-top: 10px;
         }
 
         /* スタート画面 */
@@ -79,7 +109,7 @@
             display: flex; flex-direction: column;
             align-items: center; justify-content: center; color: white;
         }
-        button {
+        button.primary-btn {
             padding: 15px 30px; font-size: 1.2rem; background: #007AFF;
             color: white; border: none; border-radius: 50px; margin-top: 20px;
         }
@@ -92,7 +122,7 @@
     <div id="start-overlay">
         <h2>Motion Sickness Guard</h2>
         <p>Beam Pro 背面カメラを使用</p>
-        <button id="start-btn">監視を開始</button>
+        <button id="start-btn" class="primary-btn">監視を開始</button>
     </div>
 
     <!-- 画面全体の警告 -->
@@ -100,10 +130,38 @@
         <div id="global-warning-text">⚠️ 酔い注意 ⚠️<br>視線を外してください</div>
     </div>
 
+    <!-- 設定モーダル -->
+    <div id="settings-modal">
+        <div id="settings-panel">
+            <h3>設定</h3>
+            
+            <div class="setting-item">
+                <div class="setting-label">
+                    <span>景色検知の閾値 (感度)</span>
+                    <span id="val-visual">15.0</span>
+                </div>
+                <input type="range" id="input-visual" min="1" max="50" step="1" value="15">
+                <small style="color:#aaa;">小さいほど敏感になります</small>
+            </div>
+
+            <div class="setting-item">
+                <div class="setting-label">
+                    <span>警告フェード時間 (秒)</span>
+                    <span id="val-fade">0.5s</span>
+                </div>
+                <input type="range" id="input-fade" min="0.1" max="5.0" step="0.1" value="0.5">
+            </div>
+
+            <button id="close-settings">閉じる</button>
+        </div>
+    </div>
+
     <!-- フローティングウィンドウ -->
     <div id="floating-window">
         <div id="window-header">
-            <span>Camera View</span>
+            <span>Camera</span>
+            <!-- 設定ボタン -->
+            <button id="settings-btn">⚙️</button>
             <div id="debug-info">Wait...</div>
         </div>
 
@@ -111,7 +169,6 @@
             <video id="camera-view" autoplay playsinline muted></video>
         </div>
 
-        <!-- リサイズ用ハンドル -->
         <div id="resize-handle"></div>
     </div>
 
@@ -128,28 +185,74 @@
         const startOverlay = document.getElementById('start-overlay');
         const canvas = document.getElementById('proc-canvas');
         const ctx = canvas.getContext('2d');
+        
+        // 設定関連要素
+        const settingsBtn = document.getElementById('settings-btn');
+        const settingsModal = document.getElementById('settings-modal');
+        const closeSettingsBtn = document.getElementById('close-settings');
+        const inputVisual = document.getElementById('input-visual');
+        const valVisual = document.getElementById('val-visual');
+        const inputFade = document.getElementById('input-fade');
+        const valFade = document.getElementById('val-fade');
 
-        // --- 変数 ---
+        // --- 変数 (初期設定) ---
         let lastFrameData = null;
         let visualMotion = 0;
         let lastAccel = { x:0, y:0, z:0 };
         let vehicleVibration = 0;
-        const VISUAL_THRESHOLD = 15.0; 
-        const VIBE_THRESHOLD = 0.5;
+        
+        // 設定値 (可変)
+        let VISUAL_THRESHOLD = 15.0; 
+        let VIBE_THRESHOLD = 0.5;
+        let FADE_DURATION = 0.5;
+
+        // --- 設定反映ロジック ---
+        function updateSettings() {
+            // 閾値更新
+            VISUAL_THRESHOLD = parseFloat(inputVisual.value);
+            valVisual.innerText = VISUAL_THRESHOLD.toFixed(1);
+
+            // フェード時間更新
+            FADE_DURATION = parseFloat(inputFade.value);
+            valFade.innerText = FADE_DURATION.toFixed(1) + 's';
+            
+            // CSS Transitionを動的に書き換え
+            globalWarning.style.transition = `opacity ${FADE_DURATION}s`;
+        }
+
+        // イベントリスナー
+        inputVisual.addEventListener('input', updateSettings);
+        inputFade.addEventListener('input', updateSettings);
+        
+        // モーダル開閉
+        settingsBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // ドラッグ開始を防ぐ
+            settingsModal.style.display = 'flex';
+        });
+        
+        // モーダルを閉じる (タッチイベントの伝播を防ぐ)
+        const closeModal = (e) => {
+            if(e) e.stopPropagation();
+            settingsModal.style.display = 'none';
+        };
+        closeSettingsBtn.addEventListener('click', closeModal);
+        // 背景クリックでも閉じる
+        settingsModal.addEventListener('click', (e) => {
+            if(e.target === settingsModal) closeModal();
+        });
+
 
         // --- 1. ドラッグ移動ロジック (ウィンドウ全体) ---
         let isDragging = false;
         let dragOffsetX, dragOffsetY;
 
-        // ウィンドウ全体でタッチ開始
         win.addEventListener('touchstart', (e) => {
-            // もしリサイズハンドルを触っていたら、ドラッグ移動はしない
-            if (e.target === resizer) return;
+            // リサイズハンドルや設定ボタンを触っていたらドラッグしない
+            if (e.target === resizer || e.target === settingsBtn) return;
 
             isDragging = true;
             const touch = e.touches[0];
             const rect = win.getBoundingClientRect();
-            // タッチした位置とウィンドウ左上のズレを保存
             dragOffsetX = touch.clientX - rect.left;
             dragOffsetY = touch.clientY - rect.top;
             e.preventDefault(); 
@@ -159,13 +262,8 @@
             if (!isDragging) return;
             const touch = e.touches[0];
             
-            // 新しい位置を計算
             let newLeft = touch.clientX - dragOffsetX;
             let newTop = touch.clientY - dragOffsetY;
-
-            // 画面外に行き過ぎないように制限 (任意)
-            // newLeft = Math.max(0, Math.min(window.innerWidth - win.offsetWidth, newLeft));
-            // newTop = Math.max(0, Math.min(window.innerHeight - win.offsetHeight, newTop));
 
             win.style.left = `${newLeft}px`;
             win.style.top = `${newTop}px`;
@@ -175,13 +273,13 @@
         document.addEventListener('touchend', () => isDragging = false);
 
 
-        // --- 2. リサイズロジック (右下のみ) ---
+        // --- 2. リサイズロジック ---
         let isResizing = false;
         let initialWidth, initialHeight, initialTouchX, initialTouchY;
 
         resizer.addEventListener('touchstart', (e) => {
             isResizing = true;
-            e.stopPropagation(); // 親(ウィンドウ)へのイベント伝播を止める
+            e.stopPropagation();
             const touch = e.touches[0];
             initialTouchX = touch.clientX;
             initialTouchY = touch.clientY;
@@ -196,7 +294,6 @@
             const dx = touch.clientX - initialTouchX;
             const dy = touch.clientY - initialTouchY;
             
-            // 最小サイズ制限
             const newW = Math.max(100, initialWidth + dx);
             const newH = Math.max(80, initialHeight + dy);
 
@@ -214,6 +311,9 @@
                 try { await DeviceMotionEvent.requestPermission(); } catch (e) {}
             }
             startOverlay.style.display = 'none';
+            // 初期設定を適用
+            updateSettings();
+            
             startCamera();
             startSensor();
             setInterval(processImage, 200);
@@ -270,16 +370,16 @@
 
             // 警告判定
             if (isSceneryMoving) {
-                globalWarning.style.opacity = 1; // 画面全体を表示
+                globalWarning.style.opacity = 1;
                 win.style.borderColor = "red";
-                win.style.boxShadow = "0 0 30px red"; // ウィンドウも光らせる
+                win.style.boxShadow = "0 0 30px red";
             } else {
                 globalWarning.style.opacity = 0;
                 win.style.borderColor = "#666";
                 win.style.boxShadow = "0 0 15px rgba(255,255,255,0.1)";
             }
             
-            debugInfo.innerText = `Vis:${visualMotion.toFixed(1)} Vib:${vehicleVibration.toFixed(2)}`;
+            debugInfo.innerText = `Vis:${visualMotion.toFixed(1)} / Thr:${VISUAL_THRESHOLD}`;
         }
     </script>
 </body>

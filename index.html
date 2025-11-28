@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Motion Sickness Guard</title>
+    <style>
+        body {
+            margin: 0; overflow: hidden;
+            background-color: #000000; /* 背景を完全な黒に */
+            font-family: sans-serif;
+            touch-action: none; /* 全体のスクロール防止 */
+        }
+
+        /* 画面全体の警告オーバーレイ */
+        #global-warning {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 0, 0, 0.5); /* 画面全体を赤く */
+            box-shadow: inset 0 0 100px red; /* 画面の端をより赤く */
+            z-index: 500; /* ウィンドウより下、背景より上 */
+            opacity: 0; transition: opacity 0.5s; pointer-events: none;
+            display: flex; align-items: center; justify-content: center;
+        }
+        #global-warning-text {
+            color: white; font-size: 3rem; font-weight: bold;
+            text-shadow: 0 0 10px black;
+            text-align: center;
+        }
+
+        /* フローティングウィンドウ */
+        #floating-window {
+            position: absolute;
+            top: 50px; left: 50px;
+            width: 320px; height: 240px;
+            min-width: 150px; min-height: 120px;
+            background: #000;
+            border: 2px solid #666; /* 黒背景で見えるように枠線を明るく */
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(255,255,255,0.1);
+            display: flex; flex-direction: column;
+            overflow: hidden;
+            z-index: 1000;
+            /* ウィンドウ全体でカーソルを移動アイコンに */
+            cursor: move;
+        }
+
+        /* ヘッダー (情報は残すが、ドラッグ判定はウィンドウ全体で行う) */
+        #window-header {
+            height: 24px;
+            background: #007AFF;
+            display: flex; align-items: center; padding: 0 10px;
+            color: white; font-size: 12px; font-weight: bold;
+            user-select: none; pointer-events: none; /* 下のウィンドウにイベントを通す */
+        }
+
+        /* カメラ表示エリア */
+        #camera-container {
+            flex: 1; position: relative; background: #000;
+            pointer-events: none; /* ドラッグを邪魔しないようにする */
+        }
+        video {
+            width: 100%; height: 100%; object-fit: cover;
+        }
+
+        /* リサイズハンドル (右下) */
+        #resize-handle {
+            position: absolute; bottom: 0; right: 0;
+            width: 40px; height: 40px; /* 押しやすいように少し大きく */
+            background: linear-gradient(135deg, transparent 50%, #007AFF 50%);
+            cursor: nwse-resize;
+            z-index: 1100;
+            touch-action: none;
+        }
+
+        /* スタート画面 */
+        #start-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 2000;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center; color: white;
+        }
+        button {
+            padding: 15px 30px; font-size: 1.2rem; background: #007AFF;
+            color: white; border: none; border-radius: 50px; margin-top: 20px;
+        }
+        #debug-info { font-size: 10px; color: lime; margin-left: auto; pointer-events: auto; }
+    </style>
+</head>
+<body>
+
+    <!-- スタート画面 -->
+    <div id="start-overlay">
+        <h2>Motion Sickness Guard</h2>
+        <p>Beam Pro 背面カメラを使用</p>
+        <button id="start-btn">監視を開始</button>
+    </div>
+
+    <!-- 画面全体の警告 -->
+    <div id="global-warning">
+        <div id="global-warning-text">⚠️ 酔い注意 ⚠️<br>視線を外してください</div>
+    </div>
+
+    <!-- フローティングウィンドウ -->
+    <div id="floating-window">
+        <div id="window-header">
+            <span>Camera View</span>
+            <div id="debug-info">Wait...</div>
+        </div>
+
+        <div id="camera-container">
+            <video id="camera-view" autoplay playsinline muted></video>
+        </div>
+
+        <!-- リサイズ用ハンドル -->
+        <div id="resize-handle"></div>
+    </div>
+
+    <canvas id="proc-canvas" style="display:none;"></canvas>
+
+    <script>
+        // --- 要素取得 ---
+        const win = document.getElementById('floating-window');
+        const resizer = document.getElementById('resize-handle');
+        const video = document.getElementById('camera-view');
+        const globalWarning = document.getElementById('global-warning');
+        const debugInfo = document.getElementById('debug-info');
+        const startBtn = document.getElementById('start-btn');
+        const startOverlay = document.getElementById('start-overlay');
+        const canvas = document.getElementById('proc-canvas');
+        const ctx = canvas.getContext('2d');
+
+        // --- 変数 ---
+        let lastFrameData = null;
+        let visualMotion = 0;
+        let lastAccel = { x:0, y:0, z:0 };
+        let vehicleVibration = 0;
+        const VISUAL_THRESHOLD = 15.0; 
+        const VIBE_THRESHOLD = 0.5;
+
+        // --- 1. ドラッグ移動ロジック (ウィンドウ全体) ---
+        let isDragging = false;
+        let dragOffsetX, dragOffsetY;
+
+        // ウィンドウ全体でタッチ開始
+        win.addEventListener('touchstart', (e) => {
+            // もしリサイズハンドルを触っていたら、ドラッグ移動はしない
+            if (e.target === resizer) return;
+
+            isDragging = true;
+            const touch = e.touches[0];
+            const rect = win.getBoundingClientRect();
+            // タッチした位置とウィンドウ左上のズレを保存
+            dragOffsetX = touch.clientX - rect.left;
+            dragOffsetY = touch.clientY - rect.top;
+            e.preventDefault(); 
+        }, {passive: false});
+
+        document.addEventListener('touchmove', (e) => {
+            if (!isDragging) return;
+            const touch = e.touches[0];
+            
+            // 新しい位置を計算
+            let newLeft = touch.clientX - dragOffsetX;
+            let newTop = touch.clientY - dragOffsetY;
+
+            // 画面外に行き過ぎないように制限 (任意)
+            // newLeft = Math.max(0, Math.min(window.innerWidth - win.offsetWidth, newLeft));
+            // newTop = Math.max(0, Math.min(window.innerHeight - win.offsetHeight, newTop));
+
+            win.style.left = `${newLeft}px`;
+            win.style.top = `${newTop}px`;
+            e.preventDefault();
+        }, {passive: false});
+
+        document.addEventListener('touchend', () => isDragging = false);
+
+
+        // --- 2. リサイズロジック (右下のみ) ---
+        let isResizing = false;
+        let initialWidth, initialHeight, initialTouchX, initialTouchY;
+
+        resizer.addEventListener('touchstart', (e) => {
+            isResizing = true;
+            e.stopPropagation(); // 親(ウィンドウ)へのイベント伝播を止める
+            const touch = e.touches[0];
+            initialTouchX = touch.clientX;
+            initialTouchY = touch.clientY;
+            initialWidth = win.offsetWidth;
+            initialHeight = win.offsetHeight;
+            e.preventDefault();
+        }, {passive: false});
+
+        document.addEventListener('touchmove', (e) => {
+            if (!isResizing) return;
+            const touch = e.touches[0];
+            const dx = touch.clientX - initialTouchX;
+            const dy = touch.clientY - initialTouchY;
+            
+            // 最小サイズ制限
+            const newW = Math.max(100, initialWidth + dx);
+            const newH = Math.max(80, initialHeight + dy);
+
+            win.style.width = `${newW}px`;
+            win.style.height = `${newH}px`;
+            e.preventDefault();
+        }, {passive: false});
+
+        document.addEventListener('touchend', () => isResizing = false);
+
+
+        // --- 3. アプリケーション開始 ---
+        startBtn.addEventListener('click', async () => {
+            if (typeof DeviceMotionEvent.requestPermission === 'function') {
+                try { await DeviceMotionEvent.requestPermission(); } catch (e) {}
+            }
+            startOverlay.style.display = 'none';
+            startCamera();
+            startSensor();
+            setInterval(processImage, 200);
+        });
+
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'environment' },
+                    audio: false 
+                });
+                video.srcObject = stream;
+            } catch (err) {
+                alert("カメラエラー: " + err);
+            }
+        }
+
+        function startSensor() {
+            window.addEventListener('devicemotion', (event) => {
+                const acc = event.acceleration;
+                if(!acc) return;
+                const dx = Math.abs(acc.x - lastAccel.x);
+                const dy = Math.abs(acc.y - lastAccel.y);
+                const dz = Math.abs(acc.z - lastAccel.z);
+                vehicleVibration = (dx + dy + dz);
+                lastAccel = { x: acc.x, y: acc.y, z: acc.z };
+            });
+        }
+
+        // --- 4. 判定ロジック & UI更新 ---
+        function processImage() {
+            if (video.readyState !== 4) return;
+            canvas.width = 32; canvas.height = 32;
+            ctx.drawImage(video, 0, 0, 32, 32);
+            
+            const frame = ctx.getImageData(0, 0, 32, 32);
+            const data = frame.data;
+            let diffSum = 0;
+
+            if (lastFrameData) {
+                for (let i = 0; i < data.length; i += 4) {
+                    diffSum += Math.abs(data[i+1] - lastFrameData[i+1]);
+                }
+                visualMotion = diffSum / (data.length / 4);
+            }
+            lastFrameData = new Uint8ClampedArray(data);
+
+            updateUI();
+        }
+
+        function updateUI() {
+            const isSceneryMoving = visualMotion > VISUAL_THRESHOLD;
+            const isShaking = vehicleVibration > VIBE_THRESHOLD;
+
+            // 警告判定
+            if (isSceneryMoving) {
+                globalWarning.style.opacity = 1; // 画面全体を表示
+                win.style.borderColor = "red";
+                win.style.boxShadow = "0 0 30px red"; // ウィンドウも光らせる
+            } else {
+                globalWarning.style.opacity = 0;
+                win.style.borderColor = "#666";
+                win.style.boxShadow = "0 0 15px rgba(255,255,255,0.1)";
+            }
+            
+            debugInfo.innerText = `Vis:${visualMotion.toFixed(1)} Vib:${vehicleVibration.toFixed(2)}`;
+        }
+    </script>
+</body>
+</html>

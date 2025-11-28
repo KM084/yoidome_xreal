@@ -2,385 +2,776 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Motion Sickness Guard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sukkiri Log - 乗り物酔い予防＆記録</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&display=swap" rel="stylesheet">
+    
     <style>
         body {
-            margin: 0; overflow: hidden;
-            background-color: #000000; /* 背景を完全な黒に */
-            font-family: sans-serif;
-            touch-action: none; /* 全体のスクロール防止 */
-            color: white;
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            background-color: #F0FDFA; /* Teal-50 */
+            color: #334155; /* Slate-700 */
         }
-
-        /* 画面全体の警告オーバーレイ */
-        #global-warning {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(255, 0, 0, 0.5);
-            box-shadow: inset 0 0 100px red;
-            z-index: 500;
-            opacity: 0; 
-            /* transitionはJSで動的に設定します */
-            pointer-events: none;
-            display: flex; align-items: center; justify-content: center;
+        /* Mobile-app like container */
+        #app-container {
+            max-width: 480px;
+            margin: 0 auto;
+            background-color: white;
+            min-height: 100vh;
+            box-shadow: 0 0 20px rgba(0,0,0,0.05);
+            position: relative;
+            padding-bottom: 90px; /* Space for bottom nav */
         }
-        #global-warning-text {
-            color: white; font-size: 3rem; font-weight: bold;
-            text-shadow: 0 0 10px black;
-            text-align: center;
+        .slide-in {
+            animation: slideIn 0.3s ease-out forwards;
         }
-
-        /* フローティングウィンドウ */
-        #floating-window {
-            position: absolute;
-            top: 50px; left: 50px;
-            width: 320px; height: 240px;
-            min-width: 150px; min-height: 120px;
-            background: #000;
-            border: 2px solid #666;
-            border-radius: 10px;
-            box-shadow: 0 0 15px rgba(255,255,255,0.1);
-            display: flex; flex-direction: column;
-            overflow: hidden;
-            z-index: 1000;
-            cursor: move;
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
-
-        /* ヘッダー */
-        #window-header {
-            height: 30px;
-            background: #007AFF;
-            display: flex; align-items: center; padding: 0 10px;
-            color: white; font-size: 12px; font-weight: bold;
-            user-select: none;
-            /* ドラッグ判定はウィンドウ全体で行うが、ボタン操作のためにポインターイベントは通す */
+        /* Range Slider Styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
         }
-        
-        #settings-btn {
-            background: none; border: none; cursor: pointer; font-size: 16px; padding: 0 10px;
-            margin-left: 10px; pointer-events: auto; /* ここだけクリック可能にする */
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 28px; /* Larger thumb */
+            width: 28px;
+            border-radius: 50%;
+            background: #14B8A6;
+            cursor: pointer;
+            margin-top: -10px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            border: 2px solid white;
         }
-
-        /* カメラ表示エリア */
-        #camera-container {
-            flex: 1; position: relative; background: #000;
-            pointer-events: none;
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 8px;
+            cursor: pointer;
+            background: #CCFBF1;
+            border-radius: 4px;
         }
-        video {
-            width: 100%; height: 100%; object-fit: cover;
+        /* Big Record Button Pulse Animation */
+        .pulse-btn {
+            animation: pulse-soft 2s infinite;
         }
-
-        /* リサイズハンドル */
-        #resize-handle {
-            position: absolute; bottom: 0; right: 0;
-            width: 40px; height: 40px;
-            background: linear-gradient(135deg, transparent 50%, #007AFF 50%);
-            cursor: nwse-resize;
-            z-index: 1100;
-            touch-action: none;
+        @keyframes pulse-soft {
+            0% { box-shadow: 0 0 0 0 rgba(20, 184, 166, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(20, 184, 166, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(20, 184, 166, 0); }
         }
-
-        /* 設定モーダル */
-        #settings-modal {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8); z-index: 3000;
-            display: none; /* 初期状態は非表示 */
-            align-items: center; justify-content: center;
+        /* Hide Scrollbar but allow scroll */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
         }
-        #settings-panel {
-            background: #222; padding: 20px; border-radius: 15px;
-            width: 80%; max-width: 400px;
-            border: 1px solid #555;
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        .no-scrollbar {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
         }
-        .setting-item { margin-bottom: 20px; }
-        .setting-label { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 14px;}
-        input[type="range"] { width: 100%; accent-color: #007AFF; }
-        
-        #close-settings {
-            width: 100%; padding: 10px; background: #444; color: white;
-            border: none; border-radius: 5px; cursor: pointer; margin-top: 10px;
+        /* Clickable Row Header Styles */
+        .row-header-btn {
+            transition: all 0.2s;
         }
-
-        /* スタート画面 */
-        #start-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: #000; z-index: 2000;
-            display: flex; flex-direction: column;
-            align-items: center; justify-content: center; color: white;
+        .row-header-btn:active {
+            transform: scale(0.95);
+            background-color: #f0fdf4;
         }
-        button.primary-btn {
-            padding: 15px 30px; font-size: 1.2rem; background: #007AFF;
-            color: white; border: none; border-radius: 50px; margin-top: 20px;
+        .row-header-active {
+            background-color: #e0f2fe !important; /* Blue-100 */
+            color: #0284c7 !important; /* Sky-600 */
+            border-right: 2px solid #0284c7;
         }
-        #debug-info { font-size: 10px; color: lime; margin-left: auto; pointer-events: auto; }
+        /* Modal Animation */
+        .modal-enter {
+            animation: modalFadeIn 0.2s ease-out forwards;
+        }
+        @keyframes modalFadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
     </style>
 </head>
 <body>
 
-    <!-- スタート画面 -->
-    <div id="start-overlay">
-        <h2>Motion Sickness Guard</h2>
-        <p>Beam Pro 背面カメラを使用</p>
-        <button id="start-btn" class="primary-btn">監視を開始</button>
-    </div>
+<div id="app-container">
+    <!-- Header -->
+    <header class="bg-teal-500 text-white p-4 sticky top-0 z-10 shadow-md flex justify-between items-center h-14">
+        <h1 class="text-lg font-bold"><i class="fa-solid fa-leaf mr-2"></i>Sukkiri Log</h1>
+        <button onclick="resetData()" class="text-xs bg-teal-600 px-2 py-1 rounded hover:bg-teal-700">リセット</button>
+    </header>
 
-    <!-- 画面全体の警告 -->
-    <div id="global-warning">
-        <div id="global-warning-text">⚠️ 酔い注意 ⚠️<br>視線を外してください</div>
-    </div>
+    <!-- Main Content Area -->
+    <main id="content" class="p-4">
+        <!-- Content injected via JS -->
+    </main>
 
-    <!-- 設定モーダル -->
-    <div id="settings-modal">
-        <div id="settings-panel">
-            <h3>設定</h3>
-            
-            <div class="setting-item">
-                <div class="setting-label">
-                    <span>景色検知の閾値 (感度)</span>
-                    <span id="val-visual">15.0</span>
-                </div>
-                <input type="range" id="input-visual" min="1" max="50" step="1" value="15">
-                <small style="color:#aaa;">小さいほど敏感になります</small>
+    <!-- Detail Modal (Hidden by default) -->
+    <div id="detail-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black bg-opacity-50 p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden modal-enter relative">
+            <!-- Modal Header -->
+            <div class="bg-teal-500 p-4 text-white flex justify-between items-center">
+                <h3 class="font-bold text-lg"><i class="fa-solid fa-circle-info mr-2"></i>記録詳細</h3>
+                <button onclick="closeDetail()" class="text-white hover:bg-teal-600 w-8 h-8 rounded-full flex items-center justify-center">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
             </div>
-
-            <div class="setting-item">
-                <div class="setting-label">
-                    <span>警告フェード時間 (秒)</span>
-                    <span id="val-fade">0.5s</span>
-                </div>
-                <input type="range" id="input-fade" min="0.1" max="5.0" step="0.1" value="0.5">
-            </div>
-
-            <button id="close-settings">閉じる</button>
-        </div>
-    </div>
-
-    <!-- フローティングウィンドウ -->
-    <div id="floating-window">
-        <div id="window-header">
-            <span>Camera</span>
-            <!-- 設定ボタン -->
-            <button id="settings-btn">⚙️</button>
-            <div id="debug-info">Wait...</div>
-        </div>
-
-        <div id="camera-container">
-            <video id="camera-view" autoplay playsinline muted></video>
-        </div>
-
-        <div id="resize-handle"></div>
-    </div>
-
-    <canvas id="proc-canvas" style="display:none;"></canvas>
-
-    <script>
-        // --- 要素取得 ---
-        const win = document.getElementById('floating-window');
-        const resizer = document.getElementById('resize-handle');
-        const video = document.getElementById('camera-view');
-        const globalWarning = document.getElementById('global-warning');
-        const debugInfo = document.getElementById('debug-info');
-        const startBtn = document.getElementById('start-btn');
-        const startOverlay = document.getElementById('start-overlay');
-        const canvas = document.getElementById('proc-canvas');
-        const ctx = canvas.getContext('2d');
-        
-        // 設定関連要素
-        const settingsBtn = document.getElementById('settings-btn');
-        const settingsModal = document.getElementById('settings-modal');
-        const closeSettingsBtn = document.getElementById('close-settings');
-        const inputVisual = document.getElementById('input-visual');
-        const valVisual = document.getElementById('val-visual');
-        const inputFade = document.getElementById('input-fade');
-        const valFade = document.getElementById('val-fade');
-
-        // --- 変数 (初期設定) ---
-        let lastFrameData = null;
-        let visualMotion = 0;
-        let lastAccel = { x:0, y:0, z:0 };
-        let vehicleVibration = 0;
-        
-        // 設定値 (可変)
-        let VISUAL_THRESHOLD = 15.0; 
-        let VIBE_THRESHOLD = 0.5;
-        let FADE_DURATION = 0.5;
-
-        // --- 設定反映ロジック ---
-        function updateSettings() {
-            // 閾値更新
-            VISUAL_THRESHOLD = parseFloat(inputVisual.value);
-            valVisual.innerText = VISUAL_THRESHOLD.toFixed(1);
-
-            // フェード時間更新
-            FADE_DURATION = parseFloat(inputFade.value);
-            valFade.innerText = FADE_DURATION.toFixed(1) + 's';
             
-            // CSS Transitionを動的に書き換え
-            globalWarning.style.transition = `opacity ${FADE_DURATION}s`;
+            <!-- Modal Body -->
+            <div class="p-6 space-y-4">
+                <div class="flex justify-between items-end border-b border-gray-100 pb-2">
+                    <div>
+                        <p class="text-xs text-gray-400 font-bold mb-1">日時</p>
+                        <p id="modal-date" class="text-gray-700 font-bold text-lg">--/-- --:--</p>
+                    </div>
+                    <div id="modal-weather" class="text-2xl text-gray-400"></div>
+                </div>
+
+                <div class="flex items-center gap-4 bg-gray-50 p-4 rounded-xl">
+                    <div id="modal-emoji" class="text-4xl">🙂</div>
+                    <div>
+                        <p class="text-xs text-gray-400 font-bold">体調レベル</p>
+                        <p id="modal-sickness" class="text-2xl font-bold text-teal-600">Lv.--</p>
+                    </div>
+                </div>
+
+                <div>
+                    <p class="text-xs text-gray-400 font-bold mb-1">メモ</p>
+                    <div id="modal-note" class="bg-gray-50 p-3 rounded-lg text-sm text-gray-700 min-h-[60px]">
+                        メモはありません
+                    </div>
+                </div>
+
+                <!-- Video Section -->
+                <div id="modal-video-section" class="hidden">
+                    <p class="text-xs text-gray-400 font-bold mb-1">動画記録</p>
+                    <div class="aspect-video bg-black rounded-lg flex items-center justify-center relative overflow-hidden group cursor-pointer">
+                        <i class="fa-solid fa-play text-4xl text-white opacity-80 group-hover:scale-110 transition"></i>
+                        <div class="absolute inset-0 bg-black bg-opacity-20"></div>
+                        <!-- Mock Video Overlay -->
+                        <p class="absolute bottom-2 right-3 text-white text-xs font-bold shadow-black drop-shadow-md">再生 (デモ)</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Modal Footer -->
+            <div class="bg-gray-50 p-4 text-center">
+                <button onclick="closeDetail()" class="text-sm text-gray-500 font-bold hover:text-gray-700">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <nav class="fixed bottom-0 w-full max-w-[480px] bg-white border-t border-gray-200 flex justify-around py-3 text-xs text-gray-500 z-20 pb-6">
+        <button onclick="navigateTo('home')" class="nav-btn flex flex-col items-center gap-1 text-teal-500 w-1/3" id="nav-home">
+            <i class="fa-solid fa-house text-xl"></i>
+            <span>ホーム</span>
+        </button>
+        <button onclick="navigateTo('record')" class="nav-btn flex flex-col items-center gap-1 hover:text-teal-500 w-1/3" id="nav-record">
+            <div class="bg-teal-500 text-white rounded-full p-3 -mt-6 shadow-lg border-4 border-white">
+                <i class="fa-solid fa-plus text-xl"></i>
+            </div>
+            <span class="mt-1 font-bold">記録</span>
+        </button>
+        <button onclick="navigateTo('history')" class="nav-btn flex flex-col items-center gap-1 hover:text-teal-500 w-1/3" id="nav-history">
+            <i class="fa-solid fa-chart-line text-xl"></i>
+            <span>振り返り</span>
+        </button>
+    </nav>
+</div>
+
+<script>
+    // --- Mock Data & State ---
+    let records = JSON.parse(localStorage.getItem('sukkiri_records_v3')) || [
+        { id: 1, date: '2023-11-10 08:30', type: 'bus', sickness: 60, weather: 'rain', note: '湿気が多くて空気が重かった。', hasVideo: false },
+        { id: 2, date: '2023-11-12 10:00', type: 'car', sickness: 10, weather: 'sunny', note: '換気をこまめにしたので快適。', hasVideo: false },
+        { id: 3, date: '2023-11-15 14:00', type: 'train', sickness: 5, weather: 'sunny', note: '', hasVideo: false },
+        { id: 4, date: '2023-11-16 18:30', type: 'bus', sickness: 75, weather: 'cloudy', note: '仕事帰りで疲れていたせいかも。', hasVideo: false },
+        { id: 5, date: '2023-11-20 09:00', type: 'ship', sickness: 95, weather: 'rain', note: '波が高くてすぐに限界がきた。', hasVideo: true },
+        { id: 6, date: '2023-11-21 11:00', type: 'car', sickness: 30, weather: 'cloudy', note: '少し気持ち悪かったが休憩で回復。', hasVideo: false },
+        { id: 7, date: '2023-11-22 13:00', type: 'train', sickness: 15, weather: 'sunny', note: '遠くの山を見ていた。', hasVideo: false },
+        { id: 8, date: '2023-11-24 10:00', type: 'bus', sickness: 40, weather: 'rain', note: '雨の匂いが少し気になった。', hasVideo: true },
+        { id: 9, date: '2023-11-25 15:30', type: 'car', sickness: 10, weather: 'sunny', note: '助手席だったので大丈夫だった。', hasVideo: false },
+        { id: 10, date: '2023-11-26 12:00', type: 'train', sickness: 20, weather: 'cloudy', note: '', hasVideo: false },
+        { id: 11, date: '2023-11-28 09:00', type: 'ship', sickness: 80, weather: 'cloudy', note: '酔い止めを飲み忘れた。', hasVideo: false },
+        { id: 12, date: '2023-11-29 16:00', type: 'car', sickness: 5, weather: 'sunny', note: '音楽を聴いてリラックスできた。', hasVideo: false }
+    ];
+
+    let lastTransport = localStorage.getItem('sukkiri_last_transport') || 'car';
+
+    let filterState = {
+        category: null,
+        value: null
+    };
+
+    // --- Navigation Logic ---
+    function navigateTo(pageId) {
+        document.querySelectorAll('.nav-btn').forEach(btn => {
+            if(btn.id !== 'nav-record') { 
+                btn.classList.remove('text-teal-500');
+                btn.classList.add('text-gray-500');
+            }
+        });
+        
+        if(pageId !== 'record') {
+             const activeBtn = document.getElementById(`nav-${pageId}`);
+             if(activeBtn) {
+                 activeBtn.classList.add('text-teal-500');
+                 activeBtn.classList.remove('text-gray-500');
+             }
         }
 
-        // イベントリスナー
-        inputVisual.addEventListener('input', updateSettings);
-        inputFade.addEventListener('input', updateSettings);
+        const content = document.getElementById('content');
+        content.innerHTML = ''; 
+
+        if (pageId === 'home') renderHome(content);
+        if (pageId === 'record') renderRecord(content);
+        if (pageId === 'history') renderHistory(content);
         
-        // モーダル開閉
-        settingsBtn.addEventListener('click', (e) => {
-            e.stopPropagation(); // ドラッグ開始を防ぐ
-            settingsModal.style.display = 'flex';
-        });
+        window.scrollTo(0,0);
+    }
+
+    // --- Page Renderers ---
+    function renderHome(container) {
+        const goodTrips = records.filter(r => r.sickness <= 30).length;
+        container.innerHTML = `
+            <div class="slide-in space-y-6 pt-2">
+                <div class="bg-gradient-to-br from-teal-400 to-teal-600 rounded-3xl p-6 text-white shadow-lg text-center relative overflow-hidden">
+                    <div class="absolute top-0 right-0 p-4 opacity-20"><i class="fa-solid fa-leaf text-6xl"></i></div>
+                    <p class="text-sm opacity-90 mb-1">現在のステータス</p>
+                    <h2 class="text-3xl font-bold mb-2">自信がついてきました！</h2>
+                    <p class="text-sm">これまでの記録で、<span class="font-bold text-yellow-300 text-lg">${goodTrips}回</span> 快適に移動できています。</p>
+                </div>
+                
+                <!-- Main Action: Big Record Button (Enhanced Visibility) -->
+                <div class="text-center py-6">
+                    <button onclick="navigateTo('record')" class="pulse-btn w-64 h-64 rounded-full bg-gradient-to-br from-teal-400 to-teal-600 border-4 border-white ring-4 ring-teal-100 shadow-2xl flex flex-col items-center justify-center mx-auto hover:from-teal-500 hover:to-teal-700 transition transform active:scale-95 group relative overflow-hidden">
+                        <!-- Shine effect -->
+                        <div class="absolute top-0 left-0 w-full h-full bg-white opacity-10 rounded-full scale-0 group-hover:scale-150 transition-transform duration-500"></div>
+                        
+                        <i class="fa-solid fa-pen-to-square text-6xl text-white mb-3 group-hover:scale-110 transition-transform drop-shadow-md"></i>
+                        <span class="text-3xl font-bold text-white drop-shadow-md tracking-wider">記録する</span>
+                        <span class="text-sm text-teal-50 mt-2 font-bold opacity-90">今の気分・状況を残す</span>
+                    </button>
+                    <p class="text-sm text-gray-500 mt-8 font-bold flex items-center justify-center gap-2">
+                         <span class="inline-block w-2 h-2 rounded-full bg-teal-500 animate-ping"></span>
+                         こまめな記録が、未来の予防につながります
+                    </p>
+                </div>
+
+                <div class="bg-orange-50 rounded-xl p-4 flex items-start gap-3">
+                    <i class="fa-solid fa-lightbulb text-orange-400 mt-1"></i>
+                    <div class="text-sm text-gray-700">
+                        <strong>ワンポイント</strong><br>
+                        遠くの景色を見るときは、進行方向を見るようにしましょう。
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function renderRecord(container) {
+        const now = new Date();
+        const dateStr = now.toISOString().slice(0, 16); 
+        container.innerHTML = `
+            <div class="slide-in">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">今の状況を記録</h2>
+                    <span class="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded">自動入力ON</span>
+                </div>
+                <form id="recordForm" onsubmit="saveRecord(event)" class="space-y-6 bg-white p-6 rounded-2xl shadow-sm">
+                    <div>
+                        <label class="block text-sm font-bold text-gray-600 mb-1">日時</label>
+                        <input type="datetime-local" id="input-date" value="${dateStr}" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-700">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-gray-600 mb-1">環境（天気・気圧）</label>
+                        <div class="bg-blue-50 p-3 rounded-xl flex items-center justify-between border border-blue-100">
+                            <div class="flex items-center gap-3">
+                                <div id="weather-icon" class="w-10 h-10 rounded-full bg-white flex items-center justify-center text-blue-400 shadow-sm">
+                                    <i class="fa-solid fa-spinner fa-spin"></i>
+                                </div>
+                                <div>
+                                    <div id="weather-text" class="font-bold text-gray-700 text-sm">取得中...</div>
+                                    <div id="weather-detail" class="text-xs text-gray-500">位置情報から解析中</div>
+                                </div>
+                            </div>
+                        </div>
+                        <input type="hidden" id="input-weather" value="unknown">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-gray-600 mb-2">乗り物の種類</label>
+                        <div class="grid grid-cols-4 gap-2">
+                            ${renderTransportOption('car', '車', lastTransport)}
+                            ${renderTransportOption('bus', 'バス', lastTransport)}
+                            ${renderTransportOption('train', '電車', lastTransport)}
+                            ${renderTransportOption('ship', '船', lastTransport)}
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-xl">
+                        <label class="block text-sm font-bold text-gray-600 mb-2">今の気分は？ (1〜100)</label>
+                        <div class="flex items-center justify-between mb-4 px-2">
+                            <span class="text-4xl transition-transform" id="emoji-display">🙂</span>
+                            <span class="font-bold text-teal-600 text-3xl" id="level-display">1</span>
+                        </div>
+                        <input type="range" id="input-sickness" min="1" max="100" value="1" step="1" oninput="updateRangeDisplay(this.value)" class="h-2">
+                        <div class="flex justify-between text-xs text-gray-400 mt-2 px-1">
+                            <span>快適</span>
+                            <span>少し</span>
+                            <span>悪い</span>
+                            <span>限界</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-gray-600 mb-1">状況を動画で記録</label>
+                        <div id="video-upload-area" class="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:bg-gray-50 transition cursor-pointer relative" onclick="document.getElementById('input-video').click()">
+                            <input type="file" id="input-video" accept="video/*" class="hidden" onchange="handleVideoPreview(this)">
+                            <div id="video-placeholder">
+                                <i class="fa-solid fa-video text-3xl text-gray-300 mb-2"></i>
+                                <p class="text-xs text-gray-500 font-bold">5秒程度の動画を追加</p>
+                                <p class="text-[10px] text-gray-400">タップして撮影または選択</p>
+                            </div>
+                            <div id="video-preview-container" class="hidden">
+                                <video id="video-preview" controls class="w-full rounded-lg max-h-40 bg-black"></video>
+                                <button type="button" onclick="event.stopPropagation(); clearVideo();" class="absolute top-2 right-2 bg-gray-800 bg-opacity-70 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-500">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                                <p class="text-[10px] text-green-600 mt-1 font-bold"><i class="fa-solid fa-check"></i> 動画が選択されました</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-gray-600 mb-1">メモ</label>
+                        <textarea id="input-note" rows="2" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm" placeholder="気になったこと"></textarea>
+                    </div>
+                    <button type="submit" class="w-full bg-teal-500 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-teal-600 transform active:scale-95 transition text-lg flex justify-center items-center gap-2">
+                        <i class="fa-solid fa-check"></i> 保存する
+                    </button>
+                </form>
+            </div>
+        `;
+        updateRangeDisplay(1);
+        fetchWeatherMock(); 
+    }
+
+    function renderTransportOption(value, label, current) {
+        const checked = value === current ? 'checked' : '';
+        const iconMap = { car: 'fa-car', bus: 'fa-bus', train: 'fa-train', ship: 'fa-ship' };
+        return `
+            <label class="cursor-pointer">
+                <input type="radio" name="transport" value="${value}" class="peer hidden" ${checked}>
+                <div class="p-3 border-2 border-transparent bg-gray-100 rounded-xl text-center text-gray-400 peer-checked:bg-teal-500 peer-checked:text-white peer-checked:shadow-md transition duration-200">
+                    <i class="fa-solid ${iconMap[value]} block text-xl mb-1"></i>
+                    <span class="text-xs font-bold">${label}</span>
+                </div>
+            </label>
+        `;
+    }
+
+    function renderHistory(container) {
+        let displayRecords = [...records].sort((a, b) => new Date(a.date) - new Date(b.date));
         
-        // モーダルを閉じる (タッチイベントの伝播を防ぐ)
-        const closeModal = (e) => {
-            if(e) e.stopPropagation();
-            settingsModal.style.display = 'none';
-        };
-        closeSettingsBtn.addEventListener('click', closeModal);
-        // 背景クリックでも閉じる
-        settingsModal.addEventListener('click', (e) => {
-            if(e.target === settingsModal) closeModal();
-        });
-
-
-        // --- 1. ドラッグ移動ロジック (ウィンドウ全体) ---
-        let isDragging = false;
-        let dragOffsetX, dragOffsetY;
-
-        win.addEventListener('touchstart', (e) => {
-            // リサイズハンドルや設定ボタンを触っていたらドラッグしない
-            if (e.target === resizer || e.target === settingsBtn) return;
-
-            isDragging = true;
-            const touch = e.touches[0];
-            const rect = win.getBoundingClientRect();
-            dragOffsetX = touch.clientX - rect.left;
-            dragOffsetY = touch.clientY - rect.top;
-            e.preventDefault(); 
-        }, {passive: false});
-
-        document.addEventListener('touchmove', (e) => {
-            if (!isDragging) return;
-            const touch = e.touches[0];
-            
-            let newLeft = touch.clientX - dragOffsetX;
-            let newTop = touch.clientY - dragOffsetY;
-
-            win.style.left = `${newLeft}px`;
-            win.style.top = `${newTop}px`;
-            e.preventDefault();
-        }, {passive: false});
-
-        document.addEventListener('touchend', () => isDragging = false);
-
-
-        // --- 2. リサイズロジック ---
-        let isResizing = false;
-        let initialWidth, initialHeight, initialTouchX, initialTouchY;
-
-        resizer.addEventListener('touchstart', (e) => {
-            isResizing = true;
-            e.stopPropagation();
-            const touch = e.touches[0];
-            initialTouchX = touch.clientX;
-            initialTouchY = touch.clientY;
-            initialWidth = win.offsetWidth;
-            initialHeight = win.offsetHeight;
-            e.preventDefault();
-        }, {passive: false});
-
-        document.addEventListener('touchmove', (e) => {
-            if (!isResizing) return;
-            const touch = e.touches[0];
-            const dx = touch.clientX - initialTouchX;
-            const dy = touch.clientY - initialTouchY;
-            
-            const newW = Math.max(100, initialWidth + dx);
-            const newH = Math.max(80, initialHeight + dy);
-
-            win.style.width = `${newW}px`;
-            win.style.height = `${newH}px`;
-            e.preventDefault();
-        }, {passive: false});
-
-        document.addEventListener('touchend', () => isResizing = false);
-
-
-        // --- 3. アプリケーション開始 ---
-        startBtn.addEventListener('click', async () => {
-            if (typeof DeviceMotionEvent.requestPermission === 'function') {
-                try { await DeviceMotionEvent.requestPermission(); } catch (e) {}
-            }
-            startOverlay.style.display = 'none';
-            // 初期設定を適用
-            updateSettings();
-            
-            startCamera();
-            startSensor();
-            setInterval(processImage, 200);
-        });
-
-        async function startCamera() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: 'environment' },
-                    audio: false 
-                });
-                video.srcObject = stream;
-            } catch (err) {
-                alert("カメラエラー: " + err);
-            }
-        }
-
-        function startSensor() {
-            window.addEventListener('devicemotion', (event) => {
-                const acc = event.acceleration;
-                if(!acc) return;
-                const dx = Math.abs(acc.x - lastAccel.x);
-                const dy = Math.abs(acc.y - lastAccel.y);
-                const dz = Math.abs(acc.z - lastAccel.z);
-                vehicleVibration = (dx + dy + dz);
-                lastAccel = { x: acc.x, y: acc.y, z: acc.z };
+        if (filterState.category && filterState.value) {
+            displayRecords = displayRecords.filter(r => {
+                if (filterState.category === 'weather') return r.weather === filterState.value;
+                if (filterState.category === 'transport') return r.type === filterState.value;
+                return true;
             });
         }
 
-        // --- 4. 判定ロジック & UI更新 ---
-        function processImage() {
-            if (video.readyState !== 4) return;
-            canvas.width = 32; canvas.height = 32;
-            ctx.drawImage(video, 0, 0, 32, 32);
+        const isWeatherActive = filterState.category === 'weather' ? 'row-header-active' : '';
+        const isTransportActive = filterState.category === 'transport' ? 'row-header-active' : '';
+
+        let filterMenuHtml = '';
+        if (filterState.category) {
+            const options = filterState.category === 'weather' 
+                ? [
+                    {val: 'sunny', label: '晴れ', icon: 'fa-sun'},
+                    {val: 'rain', label: '雨', icon: 'fa-cloud-rain'},
+                    {val: 'cloudy', label: '曇り', icon: 'fa-cloud'}
+                  ]
+                : [
+                    {val: 'car', label: '車', icon: 'fa-car'},
+                    {val: 'bus', label: 'バス', icon: 'fa-bus'},
+                    {val: 'train', label: '電車', icon: 'fa-train'},
+                    {val: 'ship', label: '船', icon: 'fa-ship'}
+                  ];
             
-            const frame = ctx.getImageData(0, 0, 32, 32);
-            const data = frame.data;
-            let diffSum = 0;
+            const buttons = options.map(opt => {
+                const isActive = filterState.value === opt.val ? 'bg-teal-500 text-white border-teal-500' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50';
+                return `<button onclick="setFilterValue('${opt.val}')" class="px-3 py-1.5 rounded-full border text-xs font-bold flex items-center gap-1 transition ${isActive}">
+                            <i class="fa-solid ${opt.icon}"></i> ${opt.label}
+                        </button>`;
+            }).join('');
 
-            if (lastFrameData) {
-                for (let i = 0; i < data.length; i += 4) {
-                    diffSum += Math.abs(data[i+1] - lastFrameData[i+1]);
-                }
-                visualMotion = diffSum / (data.length / 4);
-            }
-            lastFrameData = new Uint8ClampedArray(data);
-
-            updateUI();
+            filterMenuHtml = `
+                <div class="mb-4 bg-gray-50 p-3 rounded-xl border border-gray-100 animate-fade-in-down">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-xs font-bold text-gray-500">
+                            ${filterState.category === 'weather' ? '天気' : '乗り物'}で絞り込み中
+                        </span>
+                        <button onclick="clearFilter()" class="text-xs text-blue-500 font-bold hover:underline">
+                            <i class="fa-solid fa-xmark"></i> 解除
+                        </button>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        ${buttons}
+                    </div>
+                </div>
+            `;
+        } else {
+             filterMenuHtml = `
+                <div class="bg-indigo-50 border border-indigo-100 p-4 rounded-xl mb-4 flex gap-3 items-center">
+                    <i class="fa-solid fa-filter text-indigo-400"></i>
+                    <p class="text-xs text-indigo-800">
+                        左側の「天気」や「乗り物」アイコンをタップすると<br>
+                        グラフを絞り込んで表示できます。
+                    </p>
+                </div>
+            `;
         }
 
-        function updateUI() {
-            const isSceneryMoving = visualMotion > VISUAL_THRESHOLD;
-            const isShaking = vehicleVibration > VIBE_THRESHOLD;
+        let chartItems = '';
+        if(displayRecords.length === 0) {
+            chartItems = `<div class="p-6 text-gray-400 text-sm whitespace-nowrap">該当する記録がありません</div>`;
+        } else {
+            displayRecords.forEach(rec => {
+                const dateObj = new Date(rec.date);
+                const dateDisplay = `${dateObj.getMonth()+1}/${dateObj.getDate()}`;
+                const timeDisplay = `${dateObj.getHours()}:${String(dateObj.getMinutes()).padStart(2, '0')}`;
+                
+                const weatherData = {
+                    sunny: { icon: 'fa-sun', color: 'text-orange-400' },
+                    rain: { icon: 'fa-cloud-rain', color: 'text-blue-500' },
+                    cloudy: { icon: 'fa-cloud', color: 'text-gray-400' },
+                    unknown: { icon: 'fa-question', color: 'text-gray-300' }
+                };
+                const w = weatherData[rec.weather] || weatherData.unknown;
+                const iconMap = { car: 'fa-car', bus: 'fa-bus', train: 'fa-train', ship: 'fa-ship' };
+                const heightPercent = rec.sickness; 
+                let barColor = "bg-teal-300";
+                if(rec.sickness >= 40) barColor = "bg-yellow-300";
+                if(rec.sickness >= 60) barColor = "bg-orange-400";
+                if(rec.sickness >= 80) barColor = "bg-red-500";
 
-            // 警告判定
-            if (isSceneryMoving) {
-                globalWarning.style.opacity = 1;
-                win.style.borderColor = "red";
-                win.style.boxShadow = "0 0 30px red";
-            } else {
-                globalWarning.style.opacity = 0;
-                win.style.borderColor = "#666";
-                win.style.boxShadow = "0 0 15px rgba(255,255,255,0.1)";
-            }
-            
-            debugInfo.innerText = `Vis:${visualMotion.toFixed(1)} / Thr:${VISUAL_THRESHOLD}`;
+                const videoIndicator = rec.hasVideo 
+                    ? `<div class="absolute -bottom-3 left-1/2 -translate-x-1/2 w-5 h-5 bg-gray-800 rounded-full flex items-center justify-center border-2 border-white shadow-md z-10"><i class="fa-solid fa-play text-[8px] text-white ml-0.5"></i></div>` 
+                    : '';
+                
+                const noteIndicator = rec.note
+                    ? `<div class="absolute -top-3 left-1/2 -translate-x-1/2 text-indigo-400 drop-shadow-sm"><i class="fa-solid fa-comment-dots text-lg"></i></div>`
+                    : '';
+
+                const clickHandler = `showDetail(${rec.id})`;
+
+                // Enhanced Item UI
+                chartItems += `
+                    <div class="flex flex-col items-center min-w-[76px] group relative border-r border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
+                        <!-- Graph Bar Area (Height Fixed: 160px) -->
+                        <div class="h-[160px] w-full flex items-end justify-center pb-3 border-b border-gray-200 relative bg-white">
+                            <!-- Background Grid Lines -->
+                            <div class="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-30 pb-3">
+                                <div class="border-t border-dashed border-gray-300 w-full h-0 mt-[0%]"></div>
+                                <div class="border-t border-dashed border-gray-300 w-full h-0 mt-[25%]"></div>
+                                <div class="border-t border-dashed border-gray-300 w-full h-0 mt-[50%]"></div>
+                                <div class="border-t border-dashed border-gray-300 w-full h-0 mt-[75%]"></div>
+                            </div>
+
+                            <!-- Bar -->
+                            <div class="${barColor} w-6 rounded-t-lg relative transition-all group-hover:scale-105 group-hover:brightness-95 cursor-pointer shadow-sm z-10" 
+                                style="height: ${heightPercent}%;"
+                                onclick="${clickHandler}">
+                                ${noteIndicator}
+                                ${videoIndicator}
+                            </div>
+                        </div>
+                        
+                        <!-- Level Number (Height Fixed: h-6 / 24px) -->
+                        <div class="h-6 w-full flex items-center justify-center text-xs font-bold text-gray-500 bg-white border-b border-gray-100">${rec.sickness}</div>
+
+                        <!-- Weather Lane (Height Fixed: h-11 / 44px) -->
+                        <div class="h-11 w-full flex items-center justify-center border-b border-gray-100 bg-blue-50/40">
+                            <i class="fa-solid ${w.icon} ${w.color} text-xl drop-shadow-sm"></i>
+                        </div>
+
+                        <!-- Transport Lane (Height Fixed: h-11 / 44px) -->
+                        <div class="h-11 w-full flex items-center justify-center border-b border-gray-100 bg-white">
+                            <i class="fa-solid ${iconMap[rec.type]} text-gray-500 text-lg"></i>
+                        </div>
+
+                        <!-- Date Lane (Height Fixed: h-10 / 40px) -->
+                        <div class="h-10 w-full flex flex-col justify-center items-center bg-gray-50 rounded-b-lg">
+                            <div class="text-[10px] font-bold text-gray-500 leading-tight">${dateDisplay}</div>
+                            <div class="text-[9px] text-gray-400 leading-tight">${timeDisplay}</div>
+                        </div>
+                    </div>
+                `;
+            });
         }
-    </script>
+
+        container.innerHTML = `
+            <div class="slide-in pb-20">
+                
+                <!-- AI Analysis Button -->
+                <div class="mb-4 text-center">
+                    <button onclick="analyzeRecordsWithGemini()" class="w-full bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-bold py-3 rounded-2xl shadow-lg hover:shadow-xl transform transition active:scale-95 flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-wand-magic-sparkles text-yellow-300"></i>
+                        AIで傾向と対策を分析
+                    </button>
+                    <p class="text-[10px] text-gray-400 mt-2">Gemini AIがあなたの記録を分析します</p>
+                </div>
+
+                <h2 class="text-lg font-bold text-gray-700 mb-3 px-1">傾向をチェック</h2>
+                ${filterMenuHtml}
+                
+                <!-- Enhanced Swimlane Chart Container -->
+                <div class="bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden">
+                    <div class="flex">
+                        <!-- Left Sticky Labels (Enhanced Design & Fixed Heights) -->
+                        <div class="flex flex-col border-r border-gray-200 min-w-[76px] items-stretch text-[10px] text-gray-500 font-bold bg-white z-10 shadow-lg relative">
+                            <!-- Sickness Label (Height: 160px) -->
+                            <div class="h-[160px] flex items-center justify-center w-full border-b border-gray-200 bg-gray-50/50">
+                                <span class="-rotate-90 whitespace-nowrap text-xs tracking-widest text-gray-400">体調 LEVEL</span>
+                            </div>
+                            
+                            <!-- Level Label (Height: h-6 / 24px) -->
+                            <div class="h-6 w-full flex items-center justify-center bg-white border-b border-gray-100 border-r-4 border-r-teal-500 text-teal-600">Lv</div> 
+                            
+                            <!-- Weather Label Button (Height: h-11 / 44px) -->
+                            <button onclick="toggleFilterCategory('weather')" class="h-11 w-full flex items-center justify-center border-b border-gray-100 bg-blue-50/50 hover:bg-blue-100 transition row-header-btn ${isWeatherActive} text-gray-600 relative">
+                                天気 <i class="fa-solid fa-filter text-[8px] ml-1 opacity-50"></i>
+                            </button>
+
+                            <!-- Transport Label Button (Height: h-11 / 44px) -->
+                            <button onclick="toggleFilterCategory('transport')" class="h-11 w-full flex items-center justify-center border-b border-gray-100 hover:bg-gray-100 transition row-header-btn ${isTransportActive} text-gray-600 relative">
+                                乗り物 <i class="fa-solid fa-filter text-[8px] ml-1 opacity-50"></i>
+                            </button>
+
+                            <!-- Date Label (Height: h-10 / 40px) -->
+                            <div class="h-10 w-full flex items-center justify-center bg-gray-50 text-gray-400">日時</div>
+                        </div>
+
+                        <!-- Scrollable Content -->
+                        <div class="overflow-x-auto flex-1 bg-white">
+                            <div class="flex w-max">
+                                ${chartItems}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex justify-between items-center mt-3 px-2">
+                    <div class="flex gap-3">
+                        <p class="text-[10px] text-gray-400 flex items-center gap-1">
+                            <span class="w-4 h-4 bg-gray-800 rounded-full flex items-center justify-center border border-white text-white text-[8px]"><i class="fa-solid fa-play"></i></span>
+                            動画
+                        </p>
+                        <p class="text-[10px] text-gray-400 flex items-center gap-1">
+                            <i class="fa-solid fa-comment-dots text-indigo-400 text-sm"></i>
+                            メモ
+                        </p>
+                    </div>
+                    <p class="text-[10px] text-gray-400">グラフをタップで詳細</p>
+                </div>
+            </div>
+        `;
+    }
+
+    // --- Modal Logic ---
+    window.showDetail = function(id) {
+        const rec = records.find(r => r.id === id);
+        if(!rec) return;
+
+        // Populate Modal
+        const dateObj = new Date(rec.date);
+        document.getElementById('modal-date').innerText = `${dateObj.getMonth()+1}/${dateObj.getDate()} ${dateObj.getHours()}:${String(dateObj.getMinutes()).padStart(2, '0')}`;
+        
+        // Weather Icon
+        const weatherIcons = { sunny: 'fa-sun text-orange-400', rain: 'fa-cloud-rain text-blue-500', cloudy: 'fa-cloud text-gray-400', unknown: 'fa-question text-gray-300' };
+        const wClass = weatherIcons[rec.weather] || weatherIcons.unknown;
+        document.getElementById('modal-weather').innerHTML = `<i class="fa-solid ${wClass}"></i>`;
+
+        // Sickness
+        document.getElementById('modal-sickness').innerText = `Lv.${rec.sickness}`;
+        let emoji = '🙂';
+        let colorClass = "text-2xl font-bold text-teal-600";
+        if(rec.sickness >= 40) { emoji = '😐'; colorClass = "text-2xl font-bold text-yellow-500"; }
+        if(rec.sickness >= 60) { emoji = '😰'; colorClass = "text-2xl font-bold text-orange-500"; }
+        if(rec.sickness >= 80) { emoji = '🤢'; colorClass = "text-2xl font-bold text-red-600"; }
+        document.getElementById('modal-emoji').innerText = emoji;
+        document.getElementById('modal-sickness').className = colorClass;
+
+        // Note
+        document.getElementById('modal-note').innerText = rec.note || "メモはありません";
+
+        // Video
+        const videoSection = document.getElementById('modal-video-section');
+        if(rec.hasVideo) {
+            videoSection.classList.remove('hidden');
+        } else {
+            videoSection.classList.add('hidden');
+        }
+
+        // Show Modal
+        document.getElementById('detail-modal').classList.remove('hidden');
+    }
+
+    window.closeDetail = function() {
+        document.getElementById('detail-modal').classList.add('hidden');
+    }
+
+    // --- Filter Logic ---
+    window.toggleFilterCategory = function(category) {
+        if (filterState.category === category) {
+            filterState = { category: null, value: null };
+        } else {
+            filterState.category = category;
+            filterState.value = null; 
+        }
+        renderHistory(document.getElementById('content'));
+    }
+
+    window.setFilterValue = function(val) {
+        if (filterState.value === val) {
+             filterState.value = null;
+        } else {
+             filterState.value = val;
+        }
+        renderHistory(document.getElementById('content'));
+    }
+
+    window.clearFilter = function() {
+        filterState = { category: null, value: null };
+        renderHistory(document.getElementById('content'));
+    }
+
+    // --- Helpers & Handlers ---
+    let currentVideoFile = null;
+
+    window.handleVideoPreview = function(input) {
+        const file = input.files[0];
+        if (file) {
+            currentVideoFile = file;
+            const videoUrl = URL.createObjectURL(file);
+            const preview = document.getElementById('video-preview');
+            const container = document.getElementById('video-preview-container');
+            const placeholder = document.getElementById('video-placeholder');
+            
+            preview.src = videoUrl;
+            container.classList.remove('hidden');
+            placeholder.classList.add('hidden');
+        }
+    }
+
+    window.clearVideo = function() {
+        currentVideoFile = null;
+        document.getElementById('input-video').value = '';
+        document.getElementById('video-preview').src = '';
+        document.getElementById('video-preview-container').classList.add('hidden');
+        document.getElementById('video-placeholder').classList.remove('hidden');
+    }
+
+    window.updateRangeDisplay = function(val) {
+        const numVal = parseInt(val);
+        let emoji = '🙂';
+        let colorClass = "font-bold text-teal-600 text-3xl";
+
+        if (numVal <= 30) {
+            emoji = '🙂';
+            colorClass = "font-bold text-teal-600 text-3xl";
+        } else if (numVal <= 50) {
+            emoji = '😐';
+            colorClass = "font-bold text-teal-700 text-3xl";
+        } else if (numVal <= 70) {
+            emoji = '😰';
+            colorClass = "font-bold text-yellow-500 text-3xl";
+        } else if (numVal <= 90) {
+            emoji = '🤢';
+            colorClass = "font-bold text-orange-500 text-3xl";
+        } else {
+            emoji = '🤮';
+            colorClass = "font-bold text-red-600 text-3xl";
+        }
+
+        document.getElementById('emoji-display').innerText = emoji;
+        document.getElementById('level-display').innerText = `${numVal}`;
+        document.getElementById('level-display').className = colorClass;
+    }
+
+    window.fetchWeatherMock = function() {
+        const iconEl = document.getElementById('weather-icon');
+        const textEl = document.getElementById('weather-text');
+        const detailEl = document.getElementById('weather-detail');
+        const inputEl = document.getElementById('input-weather');
+        
+        setTimeout(() => {
+            const weathers = ['sunny', 'rain', 'cloudy'];
+            const w = weathers[Math.floor(Math.random() * weathers.length)];
+            
+            const data = { 
+                sunny: { label: '晴れ', temp: '24℃', press: '1013hPa', icon: 'fa-sun', color: 'text-orange-400' },
+                rain: { label: '雨', temp: '19℃', press: '998hPa', icon: 'fa-cloud-rain', color: 'text-blue-500' },
+                cloudy: { label: '曇り', temp: '21℃', press: '1005hPa', icon: 'fa-cloud', color: 'text-gray-400' }
+            };
+            const current = data[w];
+
+            if(iconEl) {
+                iconEl.innerHTML = `<i class="fa-solid ${current.icon}"></i>`;
+                iconEl.className = `w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm ${current.color}`;
+                textEl.innerText = current.label;
+                detailEl.innerText = `${current.temp} / ${current.press}`;
+            }
+            if(inputEl) inputEl.value = w;
+        }, 800);
+    }
+
+    window.saveRecord = function(e) {
+        e.preventDefault();
+        
+        const date = document.getElementById('input-date').value;
+        const type = document.querySelector('input[name="transport"]:checked').value;
+        const sickness = document.getElementById('input-sickness').value;
+        const weather = document.getElementById('input-weather').value;
+        const note = document.getElementById('input-note').value;
+        const hasVideo = currentVideoFile !== null;
+
+        lastTransport = type;
+        localStorage.setItem('sukkiri_last_transport', type);
+
+        const newRecord = {
+            id: Date.now(),
+            date,
+            type,
+            sickness: parseInt(sickness),
+            weather,
+            note,
+            hasVideo 
+        };
+
+        records.push(newRecord);
+        localStorage.setItem('sukkiri_records_v3', JSON.stringify(records));
+        currentVideoFile = null;
+
+        alert('記録を保存しました！');
+        navigateTo('history');
+    }
+    
+    window.resetData = function() {
+        if(confirm("データをリセットしますか？")) {
+            localStorage.removeItem('sukkiri_records_v3');
+            localStorage.removeItem('sukkiri_last_transport');
+            location.reload();
+        }
+    }
+
+    navigateTo('home');
+
+</script>
 </body>
 </html>

@@ -1,0 +1,212 @@
+body {
+    font-family: 'M PLUS Rounded 1c', sans-serif;
+    background-color: #F0FDFA;
+    /* Teal-50 */
+    color: #334155;
+    /* Slate-700 */
+}
+
+/* Mobile-app like container */
+#app-container {
+    max-width: 480px;
+    margin: 0 auto;
+    background-color: white;
+    min-height: 100vh;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.05);
+    position: relative;
+    padding-bottom: 90px;
+    /* Space for bottom nav */
+}
+
+.slide-in {
+    animation: slideIn 0.3s ease-out forwards;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Pop-in Animation for Feedback */
+.pop-in {
+    animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes popIn {
+    from {
+        opacity: 0;
+        transform: scale(0.8) translate(-50%, -50%);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1) translate(-50%, -50%);
+    }
+}
+
+/* Range Slider Styling */
+input[type=range] {
+    -webkit-appearance: none;
+    appearance: none;
+    /* 標準プロパティを追加して警告を解消 */
+    width: 100%;
+    background: transparent;
+}
+
+input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    /* こちらも念のため追加 */
+    height: 28px;
+    /* Larger thumb */
+    width: 28px;
+    border-radius: 50%;
+    background: #14B8A6;
+    cursor: pointer;
+    margin-top: -10px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    border: 2px solid white;
+}
+
+input[type=range]::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 8px;
+    cursor: pointer;
+    background: #CCFBF1;
+    border-radius: 4px;
+}
+
+/* Big Record Button Pulse Animation */
+.pulse-btn {
+    animation: pulse-soft 2s infinite;
+}
+
+@keyframes pulse-soft {
+    0% {
+        box-shadow: 0 0 0 0 rgba(20, 184, 166, 0.4);
+    }
+
+    70% {
+        box-shadow: 0 0 0 10px rgba(20, 184, 166, 0);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(20, 184, 166, 0);
+    }
+}
+
+/* Hide Scrollbar but allow scroll */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
+.no-scrollbar {
+    -ms-overflow-style: none;
+    /* IE and Edge */
+    scrollbar-width: none;
+    /* Firefox */
+}
+
+/* Clickable Row Header Styles */
+.row-header-btn {
+    transition: all 0.2s;
+}
+
+.row-header-btn:active {
+    transform: scale(0.95);
+    background-color: #f0fdf4;
+}
+
+.row-header-active {
+    background-color: #e0f2fe !important;
+    /* Blue-100 */
+    color: #0284c7 !important;
+    /* Sky-600 */
+    border-right: 2px solid #0284c7;
+}
+
+/* Modal Animation */
+.modal-enter {
+    animation: modalFadeIn 0.2s ease-out forwards;
+}
+
+@keyframes modalFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Profile Card Gradient */
+.profile-card-gradient {
+    background: linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%);
+}
+
+/* Chat Bubble Styles */
+.chat-bubble-ai {
+    background-color: #f0fdf4;
+    /* teal-50 */
+    color: #334155;
+    border-radius: 16px 16px 16px 0;
+    padding: 12px 16px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    max-width: 85%;
+}
+
+.chat-bubble-user {
+    background-color: #14b8a6;
+    /* teal-500 */
+    color: white;
+    border-radius: 16px 16px 0 16px;
+    padding: 12px 16px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    max-width: 85%;
+    margin-left: auto;
+}
+
+.typing-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    margin-right: 2px;
+    background-color: #cbd5e1;
+    border-radius: 50%;
+    animation: typing 1.4s infinite ease-in-out both;
+}
+
+.typing-dot:nth-child(1) {
+    animation-delay: -0.32s;
+}
+
+.typing-dot:nth-child(2) {
+    animation-delay: -0.16s;
+}
+
+@keyframes typing {
+
+    0%,
+    80%,
+    100% {
+        transform: scale(0);
+    }
+
+    40% {
+        transform: scale(1);
+    }
+}
